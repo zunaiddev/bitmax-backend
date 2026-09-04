@@ -54,7 +54,7 @@ class AuthService {
             throw new CustomError(HttpStatusCode.Conflict, "this user has already been verified");
         }
 
-        if(user.otpAttempts >= 5){
+        if (user.otpAttempts >= 5) {
             throw new CustomError(HttpStatusCode.Forbidden, "You have reached max number of otp attempts request a new otp");
         }
 
@@ -119,6 +119,14 @@ class AuthService {
             token: JwtService.generateToken(user._id, "AUTH", "15m"),
             refreshToken: JwtService.generateToken(user._id, "REFRESH", "30d")
         };
+    }
+
+    async resetPassword(user) {
+
+    }
+
+    async resendOtp(email) {
+
     }
 }
 
