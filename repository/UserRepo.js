@@ -1,6 +1,14 @@
 import User from "../model/User.js";
 
 class UserRepo {
+    async findById(id){
+        if (!id){
+            throw new Error("id is missing");
+        }
+
+        return await User.findOne({_id: id});
+    }
+
     async findByEmail(email) {
         if (!email) {
             throw new Error("Email is required");

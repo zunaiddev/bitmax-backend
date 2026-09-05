@@ -28,6 +28,10 @@ const otpSchema = new Schema({
         type: Date,
         default: null,
     },
+    otpNum: {
+        type: Number,
+        default: 0,
+    },
     attempts: {
         type: Number,
         default: 0,

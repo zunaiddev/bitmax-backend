@@ -11,3 +11,5 @@ class ResendPhoneOtpReq {
         }
     }
 }
+
+export default ResendPhoneOtpReq;

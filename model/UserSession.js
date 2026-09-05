@@ -15,14 +15,17 @@ const UserSession = new mongoose.Schema({
         type: String,
         required: true,
     },
+
     deviceIp: {
         type: String,
         required: true,
     },
+
     deviceType: {
         type: String,
         required: true,
     },
+
     deviceName: {
         type: String,
         required: true,

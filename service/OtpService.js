@@ -15,6 +15,10 @@ class OtpService {
             return generatedOtp;
         }
 
+        if (otp.lockUntil && otp.lockUntil < Date.now()) {
+            throw new CustomError(HttpStatusCode.TooManyRequests, "Please try again after some time");
+        }
+
         const allowedAt = new Date(otp.lastSentAt + 3 * 60 * 1000);
 
         if (allowedAt > Date.now()) {
@@ -23,9 +27,11 @@ class OtpService {
             });
         }
 
-        await OtpRepo.deleteById(otp._id);
 
-        await this.#saveNewOtp(user, generatedOtp, purpose);
+        await otp.updateOne({
+            otpHash: bcrypt.hashSync(generatedOtp, 10), otpNum: ++otp.otpNum,
+            lockUntil: otp.otpNum >= 5 ? new Date(otp.lastSentAt + (10 * 60 * 1000)) : null
+        });
 
         return generatedOtp;
     }
@@ -55,12 +61,13 @@ class OtpService {
         return true;
     }
 
-    async #saveNewOtp(user, numberOtp, purpose) {
+    async #saveNewOtp(user, numberOtp, purpose, otpNum = 0) {
         return await OtpRepo.save({
             user, purpose,
             otpHash: bcrypt.hashSync(numberOtp, 10),
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
             lastSentAt: Date.now(),
+            otpNum: otpNum + 1,
         });
     }
 }

@@ -1,4 +1,3 @@
-import User from "../model/User.js";
 import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
 import SignupRes from "../dto/SignupRes.js";
@@ -6,6 +5,7 @@ import bcrypt from "bcrypt";
 import JwtService from "./JwtService.js";
 import UserRepo from "../repository/UserRepo.js";
 import OtpService from "./OtpService.js";
+import UserSessionService from "./UserSessionService.js";
 
 class AuthService {
     async signup({name, email, phone, password}) {
@@ -21,7 +21,7 @@ class AuthService {
         }
 
         const user = await UserRepo.save({
-            name, email, phone, password,
+            name, email, phone, password: bcrypt.hashSync(password, 10),
         });
 
         const emailOtp = await OtpService.generateOtp(user, "VERIFY_EMAIL");
@@ -33,11 +33,8 @@ class AuthService {
         return new SignupRes(user);
     }
 
-    async login(loginReq) {
-        console.log(loginReq);
-        const {email, password} = loginReq;
-        const normalizedEmail = String(email).trim().toLowerCase();
-        const user = await User.findOne({email: normalizedEmail});
+    async login({email, password}, {deviceIp, deviceType, deviceName} = {}, withOtp = false, otp) {
+        const user = await UserRepo.findByEmail(email);
 
         if (!user) {
             throw new CustomError(HttpStatusCode.NotFound, "User not found");
@@ -47,7 +44,9 @@ class AuthService {
             throw new CustomError(HttpStatusCode.Unauthorized, "You are not allowed to login try again after some time");
         }
 
-        if (!bcrypt.compareSync(password, user.password)) {
+        if (withOtp) {
+            await OtpService.validateOtp(user, "LOGIN", otp);
+        } else if (!bcrypt.compareSync(password, user.password)) {
             let failedLoginAttempts = user.failedLoginAttempts;
 
             if (failedLoginAttempts >= 5) {
@@ -59,16 +58,19 @@ class AuthService {
             throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Password");
         }
 
-        if (!user.isEmailVerified || !user.isPhoneVerified) {
+        if (!(user.isEmailVerified && user.isPhoneVerified)) {
             throw new CustomError(HttpStatusCode.Forbidden, "Please verify your email and phone");
         }
 
         await user.updateOne({failedLoginAttempts: 0, lockedUntil: null});
 
-        return {
-            token: JwtService.generateToken(user._id, "AUTH", "15m"),
-            refreshToken: JwtService.generateToken(user._id, "REFRESH", "30d")
-        };
+
+        const accessToken = JwtService.generateToken(user._id, "AUTH", "15m");
+        const refreshToken = JwtService.generateToken(user._id, "REFRESH", "30d");
+
+        const session = await UserSessionService.newSession(user, accessToken, refreshToken, deviceIp, deviceType, deviceName);
+
+        return {accessToken, refreshToken, sessionId: session._id};
     }
 
     async resendEmailOtp(email) {
@@ -139,6 +141,51 @@ class AuthService {
         await user.updateOne({isPhoneVerified: true});
 
         return "Phone Verification Successful";
+    }
+
+    async requestLoginOtp(email) {
+        const user = await UserRepo.findByEmail(email);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, "User not found");
+        }
+
+        if (user.lockUntil > Date.now()) {
+            throw new CustomError(HttpStatusCode.Unauthorized, "You are not allowed to login try again after some time");
+        }
+
+        const otp = await OtpService.generateOtp(user, "LOGIN");
+        console.log("Login Otp: ", otp);
+
+        return "Otp Sent Successfully!";
+    }
+
+    async forgotPassword(email) {
+        const user = await UserRepo.findByEmail(email);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+        }
+
+        const otp = await OtpService.generateOtp(user, "RESET_PASSWORD");
+        console.log("ForgotPassword: ", otp);
+
+        return "Otp sent Successfully!";
+    }
+
+    async resetPassword({email, password, otp}) {
+        const user = await UserRepo.findByEmail(email);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+        }
+
+        await OtpService.validateOtp(user, "RESET_PASSWORD", otp);
+
+        await user.updateOne({password: bcrypt.hashSync(password, 10)});
+        await UserSessionService.deleteAll(user);
+
+        return "Password updated successfully!";
     }
 }
 

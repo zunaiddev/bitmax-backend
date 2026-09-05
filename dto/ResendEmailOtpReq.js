@@ -11,3 +11,5 @@ class ResendEmailOtpReq {
         }
     }
 }
+
+export default ResendEmailOtpReq;
