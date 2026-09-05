@@ -2,85 +2,35 @@ import User from "../model/User.js";
 import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
 import SignupRes from "../dto/SignupRes.js";
-import generateOtp from "../utils/generateOtp.js";
-import OtpPurpose from "../utils/OtpPurpose.js";
 import bcrypt from "bcrypt";
 import JwtService from "./JwtService.js";
-import EmailService from "./EmailService.js";
+import UserRepo from "../repository/UserRepo.js";
+import OtpService from "./OtpService.js";
 
 class AuthService {
-    async signup(signupReq) {
-        const {name, email, phone, password} = signupReq;
-        const normalizedEmail = String(email).trim().toLowerCase();
-        const existingUser = await User.findOne({email: normalizedEmail});
+    async signup({name, email, phone, password}) {
+        console.log(name, email, phone, password);
+        const existingUser = await UserRepo.findByEmailOrPhoneNumber(email, phone);
 
-        if (existingUser && existingUser.isVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, "User already exists with this email");
+        if (existingUser) {
+            throw new CustomError(HttpStatusCode.Conflict, "User already exists with this email or phone", {
+                id: existingUser._id,
+                emailVerified: existingUser.isEmailVerified,
+                phoneVerified: existingUser.isPhoneVerified
+            });
         }
 
-        const otp = generateOtp();
-        const userData = {
-            name, email: normalizedEmail, phone,
-            password: bcrypt.hashSync(password, 10),
-            otpHash: bcrypt.hashSync(otp, 10),
-            otpPurpose: OtpPurpose.VERIFY_EMAIL,
-            lastOtpSentAt: Date.now(),
-            otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000)
-        }
-
-        let user;
-        if (!existingUser) {
-            user = await User.create(userData);
-        } else {
-            existingUser.set(userData);
-            user = await existingUser.save();
-        }
-
-        await EmailService.sendOtpEmail(user.email, otp, user.name);
-
-        return new SignupRes(user);
-    }
-
-    async verifyEmail(otpReq) {
-        const {email, otp} = otpReq;
-
-        const user = await User.findOne({email});
-
-        if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, "User does not exist with this email");
-        }
-
-        if (user.isVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, "this user has already been verified");
-        }
-
-        if (user.otpAttempts >= 5) {
-            throw new CustomError(HttpStatusCode.Forbidden, "You have reached max number of otp attempts request a new otp");
-        }
-
-        if (!bcrypt.compareSync(otp, user.otpHash)) {
-            await user.updateOne({otpAttempts: ++user.otpAttempts});
-            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid OTP");
-        }
-
-        if (user.otpExpiresAt < Date.now()) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "OTP Expired Request a new one");
-        }
-
-        await user.updateOne({
-            $set: {
-                isVerified: true,
-                lastOtpSentAt: null,
-                otpHash: null,
-                otpAttempts: 0,
-                otpPurpose: null,
-            }
+        const user = await UserRepo.save({
+            name, email, phone, password,
         });
 
-        return {
-            token: JwtService.generateToken(user._id, "AUTH", "15m"),
-            refreshToken: JwtService.generateToken(user._id, "REFRESH", "30d")
-        };
+        const emailOtp = await OtpService.generateOtp(user, "VERIFY_EMAIL");
+        const phoneOtp = await OtpService.generateOtp(user, "VERIFY_PHONE");
+
+        console.log("Email Otp: ", emailOtp);
+        console.log("Phone Otp: ", phoneOtp);
+
+        return new SignupRes(user);
     }
 
     async login(loginReq) {
@@ -109,8 +59,8 @@ class AuthService {
             throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Password");
         }
 
-        if (!user.isVerified) {
-            throw new CustomError(HttpStatusCode.Forbidden, "Please Verify your email");
+        if (!user.isEmailVerified || !user.isPhoneVerified) {
+            throw new CustomError(HttpStatusCode.Forbidden, "Please verify your email and phone");
         }
 
         await user.updateOne({failedLoginAttempts: 0, lockedUntil: null});
@@ -121,12 +71,74 @@ class AuthService {
         };
     }
 
-    async resetPassword(user) {
+    async resendEmailOtp(email) {
+        const user = await UserRepo.findByEmail(email);
 
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+        }
+
+        if (user.isEmailVerified) {
+            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`);
+        }
+
+        const otp = await OtpService.generateOtp(user, "VERIFY_EMAIL");
+
+        console.log("Email Resend Otp: ", otp);
+
+        return "Otp Resend Successfully!";
     }
 
-    async resendOtp(email) {
+    async resendPhoneOtp(phone) {
+        const user = await UserRepo.findByPhone(phone);
 
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`);
+        }
+
+        if (user.isPhoneVerified) {
+            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`);
+        }
+
+        const otp = await OtpService.generateOtp(user, "VERIFY_PHONE");
+
+        console.log("Phone Resend Otp: ", otp);
+
+        return "Otp Resend Successfully!";
+    }
+
+    async verifyEmail({email, otp}) {
+        const user = await UserRepo.findByEmail(email);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+        }
+
+        if (user.isEmailVerified) {
+            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`);
+        }
+
+        await OtpService.validateOtp(user, "VERIFY_EMAIL", otp);
+        await user.updateOne({isEmailVerified: true});
+
+        return "Email Verification Successful";
+    }
+
+    async verifyPhone({phone, otp}) {
+        const user = await UserRepo.findByPhone(phone);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`);
+        }
+
+        if (user.isPhoneVerified) {
+            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`);
+        }
+
+        await OtpService.validateOtp(user, "VERIFY_PHONE", otp);
+        await user.updateOne({isPhoneVerified: true});
+
+        return "Phone Verification Successful";
     }
 }
 

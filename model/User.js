@@ -28,44 +28,18 @@ const userSchema = new Schema({
         required: [true, "Password is required"],
         minlength: [8, "Password must be at least 8 characters long"],
     },
-    otpExpiresAt: {
-        type: Date,
-        default: null,
-    },
-    lastOtpSentAt: {
-        type: Date,
-        default: null,
-    },
-    refreshToken: {
-        type: String,
-        default: null,
-    },
-    isVerified: {
+    isEmailVerified: {
         type: Boolean,
         default: false,
     },
-    otpPurpose: {
-        type: String,
-        default: null,
-        trim: true,
+    isPhoneVerified: {
+        type: Boolean,
+        default: false,
     },
     failedLoginAttempts: {
         type: Number,
         default: 0,
         min: [0, "Failed login attempts cannot be negative"],
-    },
-    otpHash: {
-        type: String,
-        default: null,
-    },
-    otpAttempts: {
-        type: Number,
-        default: 0,
-        min: [0, "OTP attempts cannot be negative"],
-    },
-    lockOtpUntil: {
-        type: Date,
-        default: null,
     },
     lockUntil: {
         type: Date,

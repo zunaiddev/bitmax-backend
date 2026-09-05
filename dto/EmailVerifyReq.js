@@ -1,20 +1,16 @@
-import MissingReqBodyError from "../exception/MissingReqBodyError.js";
 import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
+import Cleaner from "../utils/Cleaner.js";
 
 class EmailVerifyReq {
     constructor(body) {
-        if (!body) {
-            throw new MissingReqBodyError();
-        }
-
         const details = {};
 
-        this.email = body.email;
-        this.otp = body.otp;
+        this.email = Cleaner.cleanEmail(body.email);
+        this.otp = Cleaner.cleanOtp(body.otp);
 
-        if (!this.email) {
-            details.email = "Invalid email address";
+        if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(this.email)) {
+            details.email = "Enter a valid email";
         }
 
         if (!this.otp) {

@@ -1,17 +1,14 @@
 import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
+import Cleaner from "../utils/Cleaner.js";
 
 class SignupReq {
     constructor(body) {
-        if (!body) {
-            throw new CustomError(HttpStatusCode.UnprocessableContent, "Missing Req body");
-        }
-
         const details = {};
 
-        this.name = body.name;
-        this.email = body.email;
-        this.phone = body.phone;
+        this.name = Cleaner.cleanName(body.name);
+        this.email = Cleaner.cleanEmail(body.email);
+        this.phone = Cleaner.cleanPhone(body.phone);
         this.password = body.password;
 
         if (!/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' \-]+$/.test(body.name)) {
