@@ -13,10 +13,10 @@ class AuthService {
         const existingUser = await UserRepo.findByEmailOrPhoneNumber(email, phone);
 
         if (existingUser) {
-            throw new CustomError(HttpStatusCode.Conflict, "User already exists with this email or phone", {
+            throw new CustomError(HttpStatusCode.Conflict, "User already exists with this email or phone", "USER_ALREADY_EXISTS", {
                 id: existingUser._id,
-                emailVerified: existingUser.isEmailVerified,
-                phoneVerified: existingUser.isPhoneVerified
+                email: {value: existingUser.email, verified: existingUser.isEmailVerified},
+                phone: {value: existingUser.phone, verified: existingUser.isPhoneVerified}
             });
         }
 
@@ -37,11 +37,11 @@ class AuthService {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, "User not found");
+            throw new CustomError(HttpStatusCode.BadRequest, `${email} does not exist`, "NO_USER_FOUND");
         }
 
         if (user.lockUntil > Date.now()) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "You are not allowed to login try again after some time");
+            throw new CustomError(HttpStatusCode.Locked, "User is locked", "USER_LOCKED");
         }
 
         if (withOtp) {
@@ -55,11 +55,14 @@ class AuthService {
                 await user.updateOne({failedLoginAttempts: ++failedLoginAttempts});
             }
 
-            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Password");
+            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Password", "INVALID_PASSWORD");
         }
 
         if (!(user.isEmailVerified && user.isPhoneVerified)) {
-            throw new CustomError(HttpStatusCode.Forbidden, "Please verify your email and phone");
+            throw new CustomError(HttpStatusCode.Forbidden, "Please verify your email and phone", "NOT_VERIFIED", {
+                email: {value: user.email, verified: user.isEmailVerified},
+                phone: {value: user.phone, verified: user.isPhoneVerified}
+            });
         }
 
         await user.updateOne({failedLoginAttempts: 0, lockedUntil: null});
@@ -77,11 +80,11 @@ class AuthService {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
         }
 
         if (user.isEmailVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`);
+            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`, "EMAIL_ALREADY_VERIFIED");
         }
 
         const otp = await OtpService.generateOtp(user, "VERIFY_EMAIL");
@@ -95,11 +98,11 @@ class AuthService {
         const user = await UserRepo.findByPhone(phone);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`, "NO_USER_FOUND");
         }
 
         if (user.isPhoneVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`);
+            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`, "PHONE_ALREADY_VERIFIED");
         }
 
         const otp = await OtpService.generateOtp(user, "VERIFY_PHONE");
@@ -109,49 +112,72 @@ class AuthService {
         return "Otp Resend Successfully!";
     }
 
-    async verifyEmail({email, otp}) {
+    async verifyEmail({email, otp, deviceIp, deviceType, deviceName}) {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
         }
 
         if (user.isEmailVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`);
+            throw new CustomError(HttpStatusCode.Conflict, `${email} already verified`, "EMAIL_ALREADY_VERIFIED");
         }
 
         await OtpService.validateOtp(user, "VERIFY_EMAIL", otp);
         await user.updateOne({isEmailVerified: true});
 
-        return "Email Verification Successful";
+
+        if (user.isPhoneVerified) {
+            const accessToken = JwtService.generateToken(user._id, "AUTH", "15m");
+            const refreshToken = JwtService.generateToken(user._id, "REFRESH", "30d");
+
+            const session = await UserSessionService.newSession(user, accessToken, refreshToken, deviceIp, deviceType, deviceName);
+
+            return {accessToken, refreshToken, sessionId: session._id};
+        }
+
+        return {
+            phone: {value: user.phone, verified: false}
+        }
     }
 
-    async verifyPhone({phone, otp}) {
+    async verifyPhone({phone, otp, deviceIp, deviceType, deviceName}) {
         const user = await UserRepo.findByPhone(phone);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${phone} not found`, "NO_USER_FOUND");
         }
 
         if (user.isPhoneVerified) {
-            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`);
+            throw new CustomError(HttpStatusCode.Conflict, `${phone} already verified`, "PHONE_ALREADY_VERIFIED");
         }
 
         await OtpService.validateOtp(user, "VERIFY_PHONE", otp);
         await user.updateOne({isPhoneVerified: true});
 
-        return "Phone Verification Successful";
+        if (user.isEmailVerified) {
+            const accessToken = JwtService.generateToken(user._id, "AUTH", "15m");
+            const refreshToken = JwtService.generateToken(user._id, "REFRESH", "30d");
+
+            const session = await UserSessionService.newSession(user, accessToken, refreshToken, deviceIp, deviceType, deviceName);
+
+            return {accessToken, refreshToken, sessionId: session._id};
+        }
+
+        return {
+            email: {value: user.email, verified: false}
+        }
     }
 
     async requestLoginOtp(email) {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, "User not found");
+            throw new CustomError(HttpStatusCode.NotFound, "User not found", "NO_USER_FOUND");
         }
 
         if (user.lockUntil > Date.now()) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "You are not allowed to login try again after some time");
+            throw new CustomError(HttpStatusCode.Unauthorized, "You are not allowed to login try again after some time", "USER_LOCKED");
         }
 
         const otp = await OtpService.generateOtp(user, "LOGIN");
@@ -164,7 +190,7 @@ class AuthService {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
         }
 
         const otp = await OtpService.generateOtp(user, "RESET_PASSWORD");
@@ -177,7 +203,7 @@ class AuthService {
         const user = await UserRepo.findByEmail(email);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`);
+            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
         }
 
         await OtpService.validateOtp(user, "RESET_PASSWORD", otp);

@@ -54,12 +54,28 @@ class AuthController {
 
     async verifyEmail(req, res) {
         const emailReq = new EmailVerifyReq(req.body);
-        return res.status(200).send(await AuthService.verifyEmail(emailReq));
+        const deviceInfo = getDeviceInfo(req);
+
+        const response = await AuthService.verifyEmail({...emailReq, ...deviceInfo});
+
+        if (response.accessToken) {
+            return res.status(200).send({accessToken: response.accessToken});
+        }
+
+        return res.status(200).send(response);
     }
 
     async verifyPhone(req, res) {
         const phoneReq = new PhoneVerifyReq(req.body);
-        return res.status(200).send(await AuthService.verifyPhone(phoneReq));
+        const deviceInfo = getDeviceInfo(req);
+
+        const response = await AuthService.verifyPhone({...phoneReq, ...deviceInfo});
+
+        if (response.accessToken) {
+            return res.status(200).send({accessToken: response.accessToken});
+        }
+
+        return res.status(200).send(response);
     }
 
     async forgotPassword(req, res) {

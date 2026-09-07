@@ -26,7 +26,7 @@ class ResetPasswordReq {
         }
 
         if (Object.keys(details).length > 0) {
-            throw new CustomError(HttpStatusCode.BadRequest, "Validation failed", details);
+            throw new CustomError(HttpStatusCode.BadRequest, "Validation failed", "VALIDATION_FAILED", details);
         }
     }
 }

@@ -2,6 +2,7 @@ import UserRepo from "../repository/UserRepo.js";
 import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
 import UserSessionService from "./UserSessionService.js";
+import transformSessions from "../utils/transformSession.js";
 
 class UserService {
     async getUser(userId) {
@@ -9,26 +10,26 @@ class UserService {
     }
 
     async getSessions(userId) {
-        return await UserSessionService.getAllSessions(userId);
+        return transformSessions(await UserSessionService.getAllSessions(userId));
     }
 
     async logout(sessionId) {
         await UserSessionService.deleteSession(sessionId);
-        return "logout";
+        return {message: "logout"};
     }
 
     async logAllOut(userId) {
         const user = await this.#getUser(userId);
         await UserSessionService.deleteAll(user);
 
-        return "logAllOut";
+        return {message: "logAllOut"};
     }
 
     async #getUser(userId) {
         const user = await UserRepo.findById(userId);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.BadRequest, "No user found");
+            throw new CustomError(HttpStatusCode.BadRequest, "No user found", "NO_USER_FOUND");
         }
 
         return user;

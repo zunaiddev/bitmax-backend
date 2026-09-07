@@ -16,13 +16,13 @@ class OtpService {
         }
 
         if (otp.lockUntil && otp.lockUntil < Date.now()) {
-            throw new CustomError(HttpStatusCode.TooManyRequests, "Please try again after some time");
+            throw new CustomError(HttpStatusCode.TooManyRequests, "Please try again after some time", "TOO_MANY_REQUESTS");
         }
 
         const allowedAt = new Date(otp.lastSentAt + 3 * 60 * 1000);
 
         if (allowedAt > Date.now()) {
-            throw new CustomError(HttpStatusCode.TooEarly, "Please try again after some time", {
+            throw new CustomError(HttpStatusCode.TooEarly, "Please try again after some time", "TOO_EARLY", {
                 allowedAt
             });
         }
@@ -40,20 +40,20 @@ class OtpService {
         const fetchedOtp = await OtpRepo.findByUserAndPurpose(user, purpose);
 
         if (!fetchedOtp) {
-            throw new CustomError(HttpStatusCode.NotFound, "Otp not found request a new one to validate");
+            throw new CustomError(HttpStatusCode.NotFound, "Otp not found request a new one to validate", "OTP_NOT_FOUND");
         }
 
         if (fetchedOtp.expiresAt < Date.now()) {
-            throw new CustomError(HttpStatusCode.Forbidden, "Otp has been expired request a new one to validate");
+            throw new CustomError(HttpStatusCode.Forbidden, "Otp has been expired request a new one to validate", "OTP_EXPIRED");
         }
 
         if (fetchedOtp.attempts >= 5) {
-            throw new CustomError(HttpStatusCode.TooManyRequests, "You have reached max number of failed attempts")
+            throw new CustomError(HttpStatusCode.TooManyRequests, "You have reached max number of failed attempts", "MAX_FAILED_ATTEMPTS_REACHED");
         }
 
         if (!bcrypt.compareSync(otp, fetchedOtp.otpHash)) {
             await fetchedOtp.updateOne({attempts: ++fetchedOtp.attempts});
-            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Otp");
+            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid Otp", "INVALID_OTP");
         }
 
         await OtpRepo.deleteById(fetchedOtp._id);

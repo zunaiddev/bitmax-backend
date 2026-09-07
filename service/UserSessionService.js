@@ -12,6 +12,7 @@ class UserSessionService {
     }
 
     async deleteSession(id) {
+        console.log(id);
         await UserSessionRepo.deleteSessionById(id);
     }
 

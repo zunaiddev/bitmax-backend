@@ -7,45 +7,45 @@ async function userMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-        throw new CustomError(HttpStatusCode.Unauthorized, "Authorization header is required");
+        throw new CustomError(HttpStatusCode.Unauthorized, "Authorization header is required", "AUTH_HEADER_REQUIRED");
     }
 
     const [scheme, token] = authHeader.split(" ");
 
     if (scheme !== "Bearer" || !token) {
-        throw new CustomError(HttpStatusCode.Unauthorized, "Bearer token is required");
+        throw new CustomError(HttpStatusCode.Unauthorized, "Bearer token is required", "BEARER_TOKEN_REQUIRED");
     }
 
     try {
         const payload = JwtService.verifyToken(token);
 
         if (payload.purpose !== "AUTH") {
-            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid token purpose");
+            throw new CustomError(HttpStatusCode.Unauthorized, "Invalid token purpose", "INVALID_TOKEN_PURPOSE");
         }
 
         const sessions = await UserSessionService.getAllSessions(payload.id);
 
         if (!sessions) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "No sessions found");
+            throw new CustomError(HttpStatusCode.Unauthorized, "No sessions found", "NO_SESSIONS_FOUND");
         }
 
         const session = sessions.filter(s => s.accessToken === token)[0];
 
         if (!session) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "No sessions found");
+            throw new CustomError(HttpStatusCode.Unauthorized, "No sessions found", "NO_SESSIONS_FOUND");
         }
 
         req.userId = payload.id;
     } catch (error) {
         if (error.name === "TokenExpiredError") {
-            throw new CustomError(HttpStatusCode.Unauthorized, "Token has expired");
+            throw new CustomError(HttpStatusCode.Unauthorized, "Token has expired", "TOKEN_EXPIRED");
         }
 
         if (error instanceof CustomError) {
             throw error;
         }
 
-        throw new CustomError(HttpStatusCode.Unauthorized, "Invalid token");
+        throw new CustomError(HttpStatusCode.Unauthorized, "Invalid token", "INVALID_TOKEN");
     }
 
     next();

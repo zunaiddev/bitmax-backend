@@ -4,6 +4,7 @@ import authRouter from "./routes/AuthRoutes.js";
 import userRouter from "./routes/UserRoutes.js";
 import CustomError from "./exception/CustomError.js";
 import mongooseConfig from "./config/mongooseConfig.js";
+import logsMilldware from "./middleware/LogsMilldware.js";
 
 const app = express();
 
@@ -11,6 +12,8 @@ mongooseConfig();
 
 app.use(express.json());
 app.use(cors());
+
+app.use(logsMilldware);
 
 app.get('/', (req, res) => {
     return res.send('Welcome to the server');
@@ -21,7 +24,8 @@ app.use(userRouter);
 
 app.use(function (err, req, res, _) {
     if (err instanceof CustomError) {
-        return res.status(err.code).send({
+        return res.status(err.statusCode).send({
+            code: err.code,
             message: err.message,
             details: err.details
         });
