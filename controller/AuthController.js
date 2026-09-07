@@ -59,7 +59,7 @@ class AuthController {
         const response = await AuthService.verifyEmail({...emailReq, ...deviceInfo});
 
         if (response.accessToken) {
-            return res.status(200).send({accessToken: response.accessToken});
+            return res.status(200).send({accessToken: response.accessToken, sessionId: response.sessionId});
         }
 
         return res.status(200).send(response);
@@ -72,7 +72,7 @@ class AuthController {
         const response = await AuthService.verifyPhone({...phoneReq, ...deviceInfo});
 
         if (response.accessToken) {
-            return res.status(200).send({accessToken: response.accessToken});
+            return res.status(200).send({accessToken: response.accessToken, sessionId: response.sessionId});
         }
 
         return res.status(200).send(response);

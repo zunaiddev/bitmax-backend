@@ -3,6 +3,7 @@ import randomOtp from "../utils/generateOtp.js";
 import bcrypt from "bcrypt";
 import {HttpStatusCode} from "axios";
 import CustomError from "../exception/CustomError.js";
+import EmailService from "./EmailService.js";
 
 class OtpService {
     async generateOtp(user, purpose) {
@@ -12,8 +13,10 @@ class OtpService {
 
         if (!otp) {
             await this.#saveNewOtp(user, generatedOtp, purpose);
+            await EmailService.sendOtpEmail(user.email, generatedOtp, user.name);
             return generatedOtp;
         }
+        2
 
         if (otp.lockUntil && otp.lockUntil < Date.now()) {
             throw new CustomError(HttpStatusCode.TooManyRequests, "Please try again after some time", "TOO_MANY_REQUESTS");
@@ -32,6 +35,8 @@ class OtpService {
             otpHash: bcrypt.hashSync(generatedOtp, 10), otpNum: ++otp.otpNum,
             lockUntil: otp.otpNum >= 5 ? new Date(otp.lastSentAt + (10 * 60 * 1000)) : null
         });
+
+        await EmailService.sendOtpEmail(user.email, generatedOtp, user.name);
 
         return generatedOtp;
     }

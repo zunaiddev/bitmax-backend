@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 async function connectDB() {
     try {
-        // const connString = 'mongodb://root:pass@localhost:27017/bitmax?authSource=admin';
-        const connString = process.env.MONGO_URL;
+        const connString = 'mongodb://root:pass@localhost:27017/bitmax?authSource=admin';
+        // const connString = process.env.MONGO_URL;
         console.log("Connecting to mongodb...");
         await mongoose.connect(connString);
         console.log('MongoDB Connected Successfully!');
