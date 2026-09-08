@@ -6,6 +6,7 @@ import JwtService from "./JwtService.js";
 import UserRepo from "../repository/UserRepo.js";
 import OtpService from "./OtpService.js";
 import UserSessionService from "./UserSessionService.js";
+import EmailService from "./EmailService.js";
 
 class AuthService {
     async signup({name, email, phone, password}) {
@@ -182,7 +183,7 @@ class AuthService {
         const otp = await OtpService.generateOtp(user, "LOGIN");
         console.log("Login Otp: ", otp);
 
-        return "Otp Sent Successfully!";
+        return {message: "Otp Sent Successfully!"};
     }
 
     async forgotPassword(email) {
@@ -192,25 +193,30 @@ class AuthService {
             throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
         }
 
-        const otp = await OtpService.generateOtp(user, "RESET_PASSWORD");
-        console.log("ForgotPassword: ", otp);
+        const token = JwtService.generateToken(user._id, "RESET_PASSWORD", "30m");
 
-        return "Otp sent Successfully!";
+        await EmailService.sendForgotPasswordEmail(user.name, user.email, token);
+
+        return {message: `Email sent to ${email}`};
     }
 
-    async resetPassword({email, password, otp}) {
-        const user = await UserRepo.findByEmail(email);
+    async resetPassword({token, password}) {
+        const payload = JwtService.verifyToken(token, "RESET_PASSWORD");
+
+        const user = await UserRepo.findById(payload.id);
 
         if (!user) {
-            throw new CustomError(HttpStatusCode.NotFound, `User with ${email} not found`, "NO_USER_FOUND");
+            throw new CustomError(HttpStatusCode.NotFound, `User not found`, "NO_USER_FOUND");
         }
 
-        await OtpService.validateOtp(user, "RESET_PASSWORD", otp);
+        if (bcrypt.compareSync(password, user.password)) {
+            throw new CustomError(HttpStatusCode.Conflict, "Password can't same as current one", "SAME_PASSWORD");
+        }
 
         await user.updateOne({password: bcrypt.hashSync(password, 10)});
         await UserSessionService.deleteAll(user);
 
-        return "Password updated successfully!";
+        return {message: "Password updated successfully!"};
     }
 
     async refreshToken(req) {

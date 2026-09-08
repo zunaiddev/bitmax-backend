@@ -49,6 +49,48 @@ class EmailService {
             html,
         });
     }
+
+    async sendForgotPasswordEmail(name = "User", email, token) {
+        if (!this.transport) {
+            throw new Error("Email service is not configured. Set EMAIL_HOST and related SMTP variables.");
+        }
+
+        if (!email) {
+            throw new Error("Recipient email is required");
+        }
+
+        if (!token) {
+            throw new Error("Reset token is required");
+        }
+
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    
+        const displayName = name || "User";
+        const subject = "Reset your password";
+        const text = `Hi ${displayName},\n\nYou requested to reset your password. Please use the following link to reset your password:\n${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you did not request a password reset, you can ignore this email.`;
+        const html = `
+            <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+                <h2 style="margin-bottom: 12px;">Reset your password</h2>
+                <p>Hi ${displayName},</p>
+                <p>You requested to reset your password. Click the button below to set a new password:</p>
+                <div style="margin: 24px 0;">
+                    <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Reset Password</a>
+                </div>
+                <p style="margin-top: 16px; font-size: 14px; color: #4b5563;">Or copy and paste this link into your browser:</p>
+                <p style="font-size: 14px; word-break: break-all; color: #2563eb;">${resetUrl}</p>
+                <p style="margin-top: 16px;">This link expires in 30 minutes.</p>
+                <p>If you did not request a password reset, you can ignore this email.</p>
+            </div>
+        `;
+
+        await this.transport.sendMail({
+            from: this.from,
+            to: email,
+            subject,
+            text,
+            html,
+        });
+    }
 }
 
 export default new EmailService();
