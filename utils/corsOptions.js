@@ -1,0 +1,18 @@
+const allowedOrigins = process.env.ORIGINS.split(',');
+
+console.log("Allowed Origins:", allowedOrigins);
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Blocked by CORS policy'));
+        }
+    },
+    withCredentials: true,
+};
+
+export default corsOptions;

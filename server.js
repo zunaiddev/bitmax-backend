@@ -6,6 +6,7 @@ import userRouter from "./routes/UserRoutes.js";
 import CustomError from "./exception/CustomError.js";
 import mongooseConfig from "./config/mongooseConfig.js";
 import logsMiddleware from "./middleware/logsMiddleware.js";
+import corsOptions from "./utils/corsOptions.js";
 
 const app = express();
 
@@ -13,10 +14,7 @@ mongooseConfig();
 
 app.use(cookieParser());
 app.use(express.json());
-app.use(cors({
-    origin: "*",
-    credentials: true,
-}));
+app.use(cors(corsOptions));
 
 app.use(logsMiddleware);
 
