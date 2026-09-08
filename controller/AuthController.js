@@ -8,6 +8,7 @@ import ResendPhoneOtpReq from "../dto/ResendPhoneOtpReq.js";
 import getDeviceInfo from "../utils/getDeviceInfo.js";
 import LoginWithOtpReq from "../dto/LoginWithOtpReq.js";
 import ResetPasswordReq from "../dto/ResetPasswordReq.js";
+import setRefreshCookie from "../utils/setRefreshCookie.js";
 
 class AuthController {
     async signup(req, res) {
@@ -22,8 +23,8 @@ class AuthController {
 
         const {sessionId, accessToken, refreshToken} = await AuthService.login(loginReq, deviceInfo);
 
-        res.cookie("refreshToken", refreshToken, {httpOnly: true});
-        return res.send({sessionId, accessToken, refreshToken});
+        setRefreshCookie(res, refreshToken);
+        return res.send({sessionId, accessToken});
     }
 
     async loginWithOtp(req, res) {
@@ -33,8 +34,12 @@ class AuthController {
         const {sessionId, accessToken, refreshToken} =
             await AuthService.login({email, password: null}, deviceInfo, true, otp);
 
-        res.cookie("refreshToken", refreshToken, {httpOnly: true});
-        return res.send({sessionId, accessToken, refreshToken});
+        setRefreshCookie(res, refreshToken);
+        return res.send({sessionId, accessToken});
+    }
+
+    async refreshToken(req, res) {
+        return res.send(await AuthService.refreshToken(req));
     }
 
     async requestLoginOtp(req, res) {
@@ -59,6 +64,7 @@ class AuthController {
         const response = await AuthService.verifyEmail({...emailReq, ...deviceInfo});
 
         if (response.accessToken) {
+            setRefreshCookie(res, response.refreshToken);
             return res.status(200).send({accessToken: response.accessToken, sessionId: response.sessionId});
         }
 
@@ -72,6 +78,7 @@ class AuthController {
         const response = await AuthService.verifyPhone({...phoneReq, ...deviceInfo});
 
         if (response.accessToken) {
+            setRefreshCookie(res, response.refreshToken);
             return res.status(200).send({accessToken: response.accessToken, sessionId: response.sessionId});
         }
 

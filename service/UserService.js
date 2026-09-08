@@ -3,10 +3,11 @@ import CustomError from "../exception/CustomError.js";
 import {HttpStatusCode} from "axios";
 import UserSessionService from "./UserSessionService.js";
 import transformSessions from "../utils/transformSession.js";
+import UserResponse from "../dto/UserResponse.js";
 
 class UserService {
     async getUser(userId) {
-        return await this.#getUser(userId);
+        return new UserResponse(await this.#getUser(userId));
     }
 
     async getSessions(userId) {

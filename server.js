@@ -1,19 +1,24 @@
 import express from 'express';
+import cookieParser from "cookie-parser";
 import cors from 'cors';
 import authRouter from "./routes/AuthRoutes.js";
 import userRouter from "./routes/UserRoutes.js";
 import CustomError from "./exception/CustomError.js";
 import mongooseConfig from "./config/mongooseConfig.js";
-import logsMilldware from "./middleware/LogsMilldware.js";
+import logsMiddleware from "./middleware/logsMiddleware.js";
 
 const app = express();
 
 mongooseConfig();
 
+app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    credentials: true,
+}));
 
-app.use(logsMilldware);
+app.use(logsMiddleware);
 
 app.get('/', (req, res) => {
     return res.send('Welcome to the server');

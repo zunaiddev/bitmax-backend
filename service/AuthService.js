@@ -6,10 +6,10 @@ import JwtService from "./JwtService.js";
 import UserRepo from "../repository/UserRepo.js";
 import OtpService from "./OtpService.js";
 import UserSessionService from "./UserSessionService.js";
+import UserService from "./UserService.js";
 
 class AuthService {
     async signup({name, email, phone, password}) {
-        console.log(name, email, phone, password);
         const existingUser = await UserRepo.findByEmailOrPhoneNumber(email, phone);
 
         if (existingUser) {
@@ -91,7 +91,7 @@ class AuthService {
 
         console.log("Email Resend Otp: ", otp);
 
-        return "Otp Resend Successfully!";
+        return {message: "Otp Resend Successfully!"};
     }
 
     async resendPhoneOtp(phone) {
@@ -212,6 +212,43 @@ class AuthService {
         await UserSessionService.deleteAll(user);
 
         return "Password updated successfully!";
+    }
+
+    async refreshToken(req) {
+        const refreshToken = req.cookies?.refreshToken;
+        const sessionId = req.body.sessionId;
+
+        if (!sessionId || typeof sessionId !== "string") {
+            throw new CustomError(HttpStatusCode.BadRequest, "Missing or invalid sessionId", "MISSING_SESSION");
+        }
+
+        if (!refreshToken) {
+            throw new CustomError(HttpStatusCode.BadRequest, "Refresh token is missing", "MISSING_COOKIE");
+        }
+
+        const payload = JwtService.verifyToken(refreshToken, "REFRESH");
+
+        const user = await UserService.getUser(payload.id);
+
+        if (!user) {
+            throw new CustomError(HttpStatusCode.BadRequest, "Could not found user", "NO_USER_FOUND");
+        }
+
+        const fetchedSessions = await UserSessionService.getAllSessions(user);
+        const sessions = fetchedSessions.filter(s => s.refreshToken === refreshToken);
+
+        if (sessions.length <= 0) {
+            throw new CustomError(HttpStatusCode.Unauthorized, "Could not found any session", "NO_SESSION");
+        }
+
+        const accessToken = JwtService.generateToken(payload.id, "AUTH", "15m");
+
+        await sessions[0].updateOne({accessToken});
+
+        return {
+            accessToken,
+            sessionId: sessions[0]._id,
+        };
     }
 }
 
