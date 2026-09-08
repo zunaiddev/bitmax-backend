@@ -7,6 +7,10 @@ class UserSessionService {
         });
     }
 
+    async getSessionById(sessionId) {
+        return await UserSessionRepo.getSessionById(sessionId);
+    }
+
     async getAllSessions(user) {
         return await UserSessionRepo.getSessionsByUser(user);
     }

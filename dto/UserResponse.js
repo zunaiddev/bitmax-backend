@@ -1,6 +1,6 @@
 class UserResponse {
     constructor(user) {
-        this.id = user._id;
+        this.id = user.id;
         this.name = user.name;
         this.email = user.email;
         this.phone = user.phone;

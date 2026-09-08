@@ -6,7 +6,6 @@ import JwtService from "./JwtService.js";
 import UserRepo from "../repository/UserRepo.js";
 import OtpService from "./OtpService.js";
 import UserSessionService from "./UserSessionService.js";
-import UserService from "./UserService.js";
 
 class AuthService {
     async signup({name, email, phone, password}) {
@@ -228,27 +227,13 @@ class AuthService {
 
         const payload = JwtService.verifyToken(refreshToken, "REFRESH");
 
-        const user = await UserService.getUser(payload.id);
-
-        if (!user) {
-            throw new CustomError(HttpStatusCode.BadRequest, "Could not found user", "NO_USER_FOUND");
-        }
-
-        const fetchedSessions = await UserSessionService.getAllSessions(user);
-        const sessions = fetchedSessions.filter(s => s.refreshToken === refreshToken);
-
-        if (sessions.length <= 0) {
-            throw new CustomError(HttpStatusCode.Unauthorized, "Could not found any session", "NO_SESSION");
-        }
+        const session = await UserSessionService.getSessionById(sessionId);
 
         const accessToken = JwtService.generateToken(payload.id, "AUTH", "15m");
 
-        await sessions[0].updateOne({accessToken});
+        await session.updateOne({accessToken});
 
-        return {
-            accessToken,
-            sessionId: sessions[0]._id,
-        };
+        return {accessToken, sessionId: session._id};
     }
 }
 

@@ -16,6 +16,10 @@ class UserSessionRepo {
     async deleteAllByUser(user) {
         await UserSession.deleteMany({user});
     }
+
+    async getSessionById(sessionId) {
+        return await UserSession.findById(sessionId);
+    }
 }
 
 export default new UserSessionRepo();

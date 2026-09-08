@@ -1,4 +1,5 @@
 import UserService from "../service/UserService.js";
+import {clearRefreshCookie} from "../utils/setRefreshCookie.js";
 
 class UserController {
     async getUser(req, res) {
@@ -10,6 +11,7 @@ class UserController {
     }
 
     async logout(req, res) {
+        clearRefreshCookie(res);
         return res.send(await UserService.logout(req.query.sessionId));
     }
 

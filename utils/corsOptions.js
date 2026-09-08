@@ -1,4 +1,7 @@
-const allowedOrigins = process.env.ORIGINS.split(',');
+const allowedOrigins = (process.env.ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
 
 console.log("Allowed Origins:", allowedOrigins);
 
@@ -6,13 +9,14 @@ const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Blocked by CORS policy'));
         }
     },
-    withCredentials: true,
+    credentials: true,
+    optionsSuccessStatus: 200,
 };
 
 export default corsOptions;
